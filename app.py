@@ -153,25 +153,32 @@ if capture_faces and new_person != "":
                 st.warning("⚠ Please retrain the model")
 
 
-# ---------------- ATTENDANCE (CLOUD SAFE) ----------------
-today = datetime.now().strftime("%Y-%m-%d")
-marked = set(pd.read_csv(ATT_FILE)["Name"].values)
+# ---------------- ATTENDANCE ----------------
+from zoneinfo import ZoneInfo
+IST = ZoneInfo("Asia/Kolkata")
+
+today = datetime.now(IST).strftime("%Y-%m-%d")
+time_now = datetime.now(IST).strftime("%H:%M:%S")
+
+df_att = pd.read_csv(ATT_FILE)
+marked = set(df_att[df_att["Date"] == today]["Name"].values)
 
 if st.session_state.cam:
+    cam = cv2.VideoCapture(0)
 
-    img = st.camera_input("📷 Capture face for attendance")
-
-    if img is None:
-        st.info("Camera ready. Please capture an image.")
+    if not cam.isOpened():
+        st.error("❌ Camera not accessible")
     else:
-        file_bytes = np.asarray(bytearray(img.read()), dtype=np.uint8)
-        frame = cv2.imdecode(file_bytes, cv2.IMREAD_COLOR)
+        while st.session_state.cam:
+            ret, frame = cam.read()
+            if not ret or frame is None:
+                st.warning("⚠ Unable to read from camera")
+                break
 
-        if frame is None:
-            st.error("❌ Failed to decode image")
-        else:
             gray = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
             faces = face_cascade.detectMultiScale(gray, 1.3, 5)
+
+            labels = get_labels()
 
             for (x, y, w, h) in faces:
                 face = gray[y:y+h, x:x+w]
@@ -179,33 +186,51 @@ if st.session_state.cam:
                 face = face.reshape(1, 100, 100, 1)
 
                 pred = model.predict(face, verbose=0)
-                labels = get_labels()
-                name = labels[np.argmax(pred)]
                 conf = np.max(pred) * 100
+                idx = np.argmax(pred)
 
-                if conf > 80 and name not in marked:
-                    df = pd.read_csv(ATT_FILE)
-                    df.loc[len(df)] = [
-                        name,
-                        today,
-                        datetime.now().strftime("%H:%M:%S")
-                    ]
-                    df.to_csv(ATT_FILE, index=False)
-                    marked.add(name)
-                    st.success(f"✅ Attendance marked for {name}")
+                # ---------- UNKNOWN PERSON ----------
+                if conf < 80 or idx >= len(labels):
+                    name = "Unknown"
+                    color = (0, 0, 255)  # RED
+                    label_text = "Unknown Person"
 
-                cv2.rectangle(frame, (x, y), (x+w, y+h), (0, 255, 0), 2)
+                # ---------- KNOWN PERSON ----------
+                else:
+                    name = labels[idx]
+                    color = (0, 255, 0)  # GREEN
+
+                    if name in marked:
+                        label_text = f"{name} (Already Marked)"
+                    else:
+                        df_att.loc[len(df_att)] = [
+                            name,
+                            today,
+                            time_now
+                        ]
+                        df_att.to_csv(ATT_FILE, index=False)
+                        marked.add(name)
+                        label_text = f"{name} (Marked)"
+
+                # ---------- DRAW ROUND FACE ----------
+                center = (x + w//2, y + h//2)
+                radius = w // 2
+                cv2.circle(frame, center, radius, color, 2)
+
                 cv2.putText(
                     frame,
-                    f"{name} ({conf:.1f}%)",
-                    (x, y-10),
+                    label_text,
+                    (x, y - 10),
                     cv2.FONT_HERSHEY_SIMPLEX,
                     0.8,
-                    (0, 255, 0),
+                    color,
                     2
                 )
 
-            FRAME.image(frame, channels="BGR")
+            FRAME.image(cv2.cvtColor(frame, cv2.COLOR_BGR2RGB))
+
+    cam.release()
+
 
 # ---------------- DASHBOARD ----------------
 st.markdown("---")
