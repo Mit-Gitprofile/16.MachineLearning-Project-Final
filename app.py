@@ -189,45 +189,40 @@ if st.session_state.cam:
                 conf = np.max(pred) * 100
                 idx = np.argmax(pred)
 
-                # ---------- UNKNOWN PERSON ----------
+                # ---------- UNKNOWN ----------
                 if conf < 80 or idx >= len(labels):
                     name = "Unknown"
-                    color = (0, 0, 255)  # Red
+                    color = (0, 0, 255)
                     label_text = "Unknown Person"
 
-                # ---------- KNOWN PERSON ----------
+                # ---------- KNOWN ----------
                 else:
                     name = labels[idx]
-                    color = (0, 255, 0)  # Green
+                    color = (0, 255, 0)
 
                     if name in marked:
                         label_text = f"{name} (Already Marked)"
-                        st.warning(f"⚠ {name} already marked today")
                     else:
-                        df_att.loc[len(df_att)] = [
-                            name,
-                            today,
-                            time_now
-                        ]
+                        df_att.loc[len(df_att)] = [name, today, time_now]
                         df_att.to_csv(ATT_FILE, index=False)
                         marked.add(name)
                         label_text = f"{name} (Marked)"
-                        st.success(f"✅ Attendance marked for {name}")
 
-                # ---------- DRAW ROUND FACE ----------
+                # ✅ DRAW ON output_frame (NOT frame)
                 center = (x + w // 2, y + h // 2)
                 radius = w // 2
-                cv2.circle(frame, center, radius, color, 2)
+                cv2.circle(output_frame, center, radius, color, 3)
 
                 cv2.putText(
-                    frame,
+                    output_frame,
                     label_text,
                     (x, y - 10),
                     cv2.FONT_HERSHEY_SIMPLEX,
-                    0.8,
+                    0.9,
                     color,
                     2
                 )
+
 
             FRAME.image(frame, channels="BGR")
 
