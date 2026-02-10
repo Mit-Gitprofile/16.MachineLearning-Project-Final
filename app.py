@@ -89,9 +89,13 @@ st.title("🤖 AI Face Attendance System")
 
 @st.cache_resource
 def load_model():
-    return tf.keras.models.load_model(MODEL_PATH)
+    if not os.path.isfile("model/face_model.h5"):
+        st.error("❌ face_model.h5 not found in model folder.")
+        st.stop()
+    return tf.keras.models.load_model("model/face_model.h5", compile=False)
 
-model=load_model()
+model = load_model()
+
 
 def get_labels():
     return os.listdir(DATASET_PATH)
