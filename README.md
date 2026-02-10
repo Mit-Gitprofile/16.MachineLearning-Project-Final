@@ -1,8 +1,13 @@
-<p align="center">
-  <img src="assets/banner.png" width="100%">
-</p>
+
 
 <h1 align="center">🤖 AI-Powered Face Recognition Attendance System</h1>
+
+<p align="center">
+  <a href="https://16machinelearning-project-final-53p2ybemcsnx5ksl6wjntp.streamlit.app/" target="_blank">
+      🚀 <strong>Open Live Demo</strong>
+  </a>
+</p>
+
 
 <p align="center">
   <b>Real-Time | Secure | Intelligent | Web-Based</b>
