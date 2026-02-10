@@ -126,21 +126,32 @@ capture_faces=st.sidebar.button("📸 Add Person")
 FRAME=st.image([])
 
 # ---------------- ADD PERSON ----------------
-if capture_faces and new_person!="":
-    path=os.path.join(DATASET_PATH,new_person)
-    os.makedirs(path,exist_ok=True)
-    cam=cv2.VideoCapture(0)
-    st.info("Capturing 20 images...")
-    c=0
-    while c<20:
-        ret,frame=cam.read()
-        gray=cv2.cvtColor(frame,cv2.COLOR_BGR2GRAY)
-        cv2.imwrite(f"{path}/{c}.jpg",gray)
-        FRAME.image(cv2.cvtColor(frame,cv2.COLOR_BGR2RGB))
-        c+=1
-        time.sleep(0.2)
-    cam.release()
-    st.success("Person Added. Retrain model!")
+# ---------------- ADD PERSON (CLOUD SAFE) ----------------
+if capture_faces and new_person != "":
+
+    person_path = os.path.join(DATASET_PATH, new_person)
+    os.makedirs(person_path, exist_ok=True)
+
+    img = st.camera_input("📸 Capture face images (20 samples)")
+
+    if img is not None:
+        file_bytes = np.asarray(bytearray(img.read()), dtype=np.uint8)
+        frame = cv2.imdecode(file_bytes, cv2.IMREAD_COLOR)
+
+        if frame is None:
+            st.error("❌ Failed to read image")
+        else:
+            gray = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
+
+            count = len(os.listdir(person_path))
+            cv2.imwrite(f"{person_path}/{count}.jpg", gray)
+
+            st.success(f"✅ Image {count+1}/20 saved")
+
+            if count + 1 >= 20:
+                st.success("🎉 Person added successfully!")
+                st.warning("⚠ Please retrain the model")
+
 
 # ---------------- ATTENDANCE (CLOUD SAFE) ----------------
 today = datetime.now().strftime("%Y-%m-%d")
