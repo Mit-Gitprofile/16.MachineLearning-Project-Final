@@ -154,92 +154,85 @@ if capture_faces and new_person != "":
 
 
 # ---------------- ATTENDANCE (CLOUD SAFE) ----------------
-# ---------------- ATTENDANCE (CLOUD SAFE + FACE BOXES) ----------------
+import pytz
+india_tz = pytz.timezone("Asia/Kolkata")
 
-from datetime import datetime
-import cv2
-import numpy as np
-import pandas as pd
-import streamlit as st
+today = datetime.now(india_tz).strftime("%Y-%m-%d")
 
-today = datetime.now().strftime("%Y-%m-%d")
+# Load already marked names for today
+if os.path.exists(ATT_FILE):
+    df_att = pd.read_csv(ATT_FILE)
+    marked = set(df_att[df_att["Date"] == today]["Name"].values)
+else:
+    marked = set()
 
-# Read attendance safely
-if not os.path.exists(ATT_FILE):
-    pd.DataFrame(columns=["Name", "Date", "Time"]).to_csv(ATT_FILE, index=False)
+if st.session_state.cam:
 
-marked = set(
-    pd.read_csv(ATT_FILE)
-    .query("Date == @today")["Name"]
-    .values
-)
+    img = st.camera_input("📷 Live Attendance Camera")
 
-FRAME = st.empty()
-
-st.info("📸 Click **Capture** repeatedly to simulate live camera")
-
-img = st.camera_input("🎥 Attendance Camera", key="attendance_cam")
-
-if img is not None:
-
-    file_bytes = np.asarray(bytearray(img.read()), dtype=np.uint8)
-    frame = cv2.imdecode(file_bytes, cv2.IMREAD_COLOR)
-
-    if frame is None:
-        st.error("❌ Failed to read camera image")
+    if img is None:
+        st.info("Camera is ready. Capture image to mark attendance.")
     else:
-        gray = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
-        faces = face_cascade.detectMultiScale(gray, 1.3, 5)
+        file_bytes = np.asarray(bytearray(img.read()), dtype=np.uint8)
+        frame = cv2.imdecode(file_bytes, cv2.IMREAD_COLOR)
 
-        labels = get_labels()
+        if frame is None:
+            st.error("❌ Failed to read camera image")
+        else:
+            gray = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
+            faces = face_cascade.detectMultiScale(gray, 1.3, 5)
 
-        for (x, y, w, h) in faces:
-            face = gray[y:y+h, x:x+w]
-            face = cv2.resize(face, (100, 100)) / 255.0
-            face = face.reshape(1, 100, 100, 1)
+            labels = get_labels()   # From dataset folders
 
-            pred = model.predict(face, verbose=0)
-            conf = np.max(pred) * 100
-            idx = np.argmax(pred)
+            for (x, y, w, h) in faces:
+                face = gray[y:y+h, x:x+w]
+                face = cv2.resize(face, (100, 100)) / 255.0
+                face = face.reshape(1, 100, 100, 1)
 
-            if conf > 80 and idx < len(labels):
-                name = labels[idx]
+                pred = model.predict(face, verbose=0)
+                conf = np.max(pred) * 100
+                idx = np.argmax(pred)
 
-                # Known person → GREEN
-                color = (0, 255, 0)
+                if conf > 80:
+                    name = labels[idx]
 
-                if name in marked:
-                    status = "Already Attended"
+                    if name not in marked:
+                        df_att = pd.read_csv(ATT_FILE)
+                        df_att.loc[len(df_att)] = [
+                            name,
+                            today,
+                            datetime.now(india_tz).strftime("%H:%M:%S")
+                        ]
+                        df_att.to_csv(ATT_FILE, index=False)
+                        marked.add(name)
+                        st.success(f"✅ Attendance marked for {name}")
+                    else:
+                        st.warning(f"ℹ {name} already marked today")
+
+                    color = (0, 255, 0)   # GREEN for known
+                    text = f"{name} ({conf:.1f}%)"
+
                 else:
-                    df = pd.read_csv(ATT_FILE)
-                    df.loc[len(df)] = [
-                        name,
-                        today,
-                        datetime.now().strftime("%H:%M:%S")
-                    ]
-                    df.to_csv(ATT_FILE, index=False)
-                    marked.add(name)
-                    status = "Attendance Marked"
+                    color = (0, 0, 255)   # RED for unknown
+                    text = "Unknown"
 
-            else:
-                # Unknown person → RED
-                name = "Unknown"
-                status = "Not Registered"
-                color = (0, 0, 255)
+                # Draw box
+                cv2.rectangle(frame, (x, y), (x+w, y+h), color, 2)
 
-            # Draw box & label
-            cv2.rectangle(frame, (x, y), (x+w, y+h), color, 2)
-            cv2.putText(
-                frame,
-                f"{name} | {status}",
-                (x, y-10),
-                cv2.FONT_HERSHEY_SIMPLEX,
-                0.7,
-                color,
-                2
-            )
+                # Draw label
+                cv2.putText(
+                    frame,
+                    text,
+                    (x, y - 10),
+                    cv2.FONT_HERSHEY_SIMPLEX,
+                    0.8,
+                    color,
+                    2
+                )
 
-        FRAME.image(frame, channels="BGR")
+            FRAME.image(frame, channels="BGR")
+
+
 
 
 # ---------------- DASHBOARD ----------------
