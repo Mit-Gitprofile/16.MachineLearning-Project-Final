@@ -153,7 +153,7 @@ if capture_faces and new_person != "":
                 st.warning("⚠ Please retrain the model")
 
 
-# ---------------- ATTENDANCE ----------------
+# ---------------- ATTENDANCE (CLOUD SAFE) ----------------
 from zoneinfo import ZoneInfo
 IST = ZoneInfo("Asia/Kolkata")
 
@@ -164,20 +164,20 @@ df_att = pd.read_csv(ATT_FILE)
 marked = set(df_att[df_att["Date"] == today]["Name"].values)
 
 if st.session_state.cam:
-    cam = cv2.VideoCapture(0)
 
-    if not cam.isOpened():
-        st.error("❌ Camera not accessible")
+    img = st.camera_input("📷 Capture face for attendance")
+
+    if img is None:
+        st.info("Camera ready. Please capture an image.")
     else:
-        while st.session_state.cam:
-            ret, frame = cam.read()
-            if not ret or frame is None:
-                st.warning("⚠ Unable to read from camera")
-                break
+        file_bytes = np.asarray(bytearray(img.read()), dtype=np.uint8)
+        frame = cv2.imdecode(file_bytes, cv2.IMREAD_COLOR)
 
+        if frame is None:
+            st.error("❌ Failed to decode image")
+        else:
             gray = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
             faces = face_cascade.detectMultiScale(gray, 1.3, 5)
-
             labels = get_labels()
 
             for (x, y, w, h) in faces:
@@ -192,16 +192,17 @@ if st.session_state.cam:
                 # ---------- UNKNOWN PERSON ----------
                 if conf < 80 or idx >= len(labels):
                     name = "Unknown"
-                    color = (0, 0, 255)  # RED
+                    color = (0, 0, 255)  # Red
                     label_text = "Unknown Person"
 
                 # ---------- KNOWN PERSON ----------
                 else:
                     name = labels[idx]
-                    color = (0, 255, 0)  # GREEN
+                    color = (0, 255, 0)  # Green
 
                     if name in marked:
                         label_text = f"{name} (Already Marked)"
+                        st.warning(f"⚠ {name} already marked today")
                     else:
                         df_att.loc[len(df_att)] = [
                             name,
@@ -211,9 +212,10 @@ if st.session_state.cam:
                         df_att.to_csv(ATT_FILE, index=False)
                         marked.add(name)
                         label_text = f"{name} (Marked)"
+                        st.success(f"✅ Attendance marked for {name}")
 
                 # ---------- DRAW ROUND FACE ----------
-                center = (x + w//2, y + h//2)
+                center = (x + w // 2, y + h // 2)
                 radius = w // 2
                 cv2.circle(frame, center, radius, color, 2)
 
@@ -227,9 +229,7 @@ if st.session_state.cam:
                     2
                 )
 
-            FRAME.image(cv2.cvtColor(frame, cv2.COLOR_BGR2RGB))
-
-    cam.release()
+            FRAME.image(frame, channels="BGR")
 
 
 # ---------------- DASHBOARD ----------------
