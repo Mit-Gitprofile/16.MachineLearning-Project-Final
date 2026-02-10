@@ -9,7 +9,7 @@ import time
 
 # ---------------- PATH CONFIG ----------------
 BASE = r"F:\Github_Desktop\16.MachineLearning-Project-Final"
-MODEL_PATH = BASE + r"\model\face_model.h5"
+MODEL_PATH = "F:\Github_Desktop\16.MachineLearning-Project-Final\model\face_model.h5"
 DATASET_PATH = BASE + r"\dataset"
 ATT_FILE = BASE + r"\attendance.csv"
 USER_FILE = BASE + r"\users.csv"
