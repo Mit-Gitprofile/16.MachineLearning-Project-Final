@@ -143,44 +143,53 @@ if capture_faces and new_person!="":
     st.success("Person Added. Retrain model!")
 
 # ---------------- ATTENDANCE ----------------
-today=datetime.now().strftime("%Y-%m-%d")
-marked=set(pd.read_csv(ATT_FILE)["Name"].values)
+today = datetime.now().strftime("%Y-%m-%d")
+marked = set(pd.read_csv(ATT_FILE)["Name"].values)
 
 if st.session_state.cam:
-    cam=cv2.VideoCapture(0)
+    cam = cv2.VideoCapture(0)
 
-    while st.session_state.cam:
-        ret,frame=cam.read()
-        gray=cv2.cvtColor(frame,cv2.COLOR_BGR2GRAY)
+    if not cam.isOpened():
+        st.error("❌ Camera not accessible")
+    else:
+        while st.session_state.cam:
+            ret, frame = cam.read()
 
-        faces=face_cascade.detectMultiScale(gray,1.3,5)
+            # ✅ IMPORTANT FIX
+            if not ret or frame is None:
+                st.warning("⚠ Unable to read from camera")
+                break
 
-        for(x,y,w,h) in faces:
-            face=gray[y:y+h,x:x+w]
-            face=cv2.resize(face,(100,100))/255.0
-            face=face.reshape(1,100,100,1)
+            gray = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
 
-            pred=model.predict(face,verbose=0)
-            labels=get_labels()
-            name=labels[np.argmax(pred)]
-            conf=np.max(pred)*100
+            faces = face_cascade.detectMultiScale(gray, 1.3, 5)
 
-            if conf>80:
-                if name in marked:
-                    st.warning(f"{name} already marked today")
-                else:
-                    df=pd.read_csv(ATT_FILE)
-                    df.loc[len(df)]=[
-                    name,today,
-                    datetime.now().strftime("%H:%M:%S")]
-                    df.to_csv(ATT_FILE,index=False)
-                    marked.add(name)
+            for (x, y, w, h) in faces:
+                face = gray[y:y+h, x:x+w]
+                face = cv2.resize(face, (100, 100)) / 255.0
+                face = face.reshape(1, 100, 100, 1)
 
-            cv2.putText(frame,name,(x,y-10),
-            cv2.FONT_HERSHEY_SIMPLEX,0.8,(0,255,0),2)
-            cv2.rectangle(frame,(x,y),(x+w,y+h),(0,255,0),2)
+                pred = model.predict(face, verbose=0)
+                labels = get_labels()
+                name = labels[np.argmax(pred)]
+                conf = np.max(pred) * 100
 
-        FRAME.image(cv2.cvtColor(frame,cv2.COLOR_BGR2RGB))
+                if conf > 80:
+                    if name not in marked:
+                        df = pd.read_csv(ATT_FILE)
+                        df.loc[len(df)] = [
+                            name,
+                            today,
+                            datetime.now().strftime("%H:%M:%S")
+                        ]
+                        df.to_csv(ATT_FILE, index=False)
+                        marked.add(name)
+
+                cv2.putText(frame, f"{name} ({conf:.1f}%)", (x, y-10),
+                            cv2.FONT_HERSHEY_SIMPLEX, 0.8, (0, 255, 0), 2)
+                cv2.rectangle(frame, (x, y), (x+w, y+h), (0, 255, 0), 2)
+
+            FRAME.image(cv2.cvtColor(frame, cv2.COLOR_BGR2RGB))
 
     cam.release()
 
