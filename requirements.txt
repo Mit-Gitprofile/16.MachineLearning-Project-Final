@@ -5,3 +5,4 @@ pandas
 tensorflow
 Pillow
 opencv-python-headless
+pytz
